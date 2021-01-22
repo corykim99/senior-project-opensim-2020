@@ -15,7 +15,7 @@ from osim.env import L2M2019Env
 
 # Initialize Environment
 env_name = 'L2M2019Env'
-env = L2M2019Env(visualize=True)
+env = L2M2019Env(visualize=False)
 env.reset()
 env._max_episode_steps = 1000 #set max steps per episode
 env.seed(0) #set environment seed for same initial cart positions
@@ -104,24 +104,21 @@ def discretization(env, obs):
             index += 1
     
     # Obtain density values (step sizes)
-    env_den = np.subtract(env_high, env_low)
-    env_den = np.divide(env_den, n_states)
-
+    #env_den = np.subtract(env_high, env_low)
+    #env_den = np.divide(env_den, n_states)
+    
     # Scale values
-    obs_scaled = np.subtract(obs_val, env_low)
-    obs_scaled = np.divide(obs_scaled, env_den)
-    for i in range(339):
-        if obs_scaled[i] > 0:
-            obs_scaled[i] = obs_scaled[i] - 1
-    obs_scaled = obs_scaled.astype(int)
+    #obs_scaled = np.subtract(obs_val, env_low)
+    #obs_scaled = np.divide(obs_scaled, env_den)
+    obs_scaled = np.array(obs_val).astype(int)
     #print(obs_scaled)
+    
     return obs_scaled
 
 # Q-table = 3D table
 # Rows = states (states = 2D table : pos, vel)
 # Columns = actions
 # look into exporting data
-# 339 x 22
 q_table = np.zeros((n_states, env.action_space.shape[0])) #fill Q-table with zeros
 
 # Store Training Start Time
@@ -151,15 +148,11 @@ for episode in range(episodes):
         if np.random.uniform(low = 0, high = 1) < epsilon:
             # Explore
             a = np.random.randint(2, size=22)
-            #a = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             #print(a)
         else:
             # Exploit
             #a = np.random.randint(2, size=22)
-            #a = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-            #0 to 2^22-1
-            i = int(np.argmax(q_table[obs_val]) / 22)
-            #print(q_table[obs_val])
+            i = np.argmax(q_table[obs_val])
             a = np.array(q_table[obs_val[i]]).astype(int)
             #print(a)
         
@@ -168,12 +161,7 @@ for episode in range(episodes):
         
         # Update Q-table
         obs_val_ = discretization(env, obs)
-        a = a[None,:]
-        obs_val = obs_val[:,None]
-        q_table[obs_val, a] = (1 - alpha) * q_table[obs_val, a]  + alpha * (reward + gamma * np.max(q_table[obs_val_]))
-        #print(reward)
-        #print(q_table)
-        #print("(1 - {}) * {} + {} * ({} + {} * {})".format(alpha, q_table[obs_val, a], alpha, reward, gamma, np.max(q_table[obs_val_])))
+        q_table[obs_val][a] = (1 - alpha) * q_table[obs_val][a]  + alpha * (reward + gamma * np.max(q_table[obs_val_]))
         steps += 1
         
         # Goal reach (cart reached flag)
@@ -182,7 +170,7 @@ for episode in range(episodes):
             
     # Print results when episode is complete
     print("Episode : Total Reward : Steps\t\t{} : {} : {}".format(episode + 1, truncate(total_reward, 3), steps))
-    print(q_table)
+    
     # Add rewards and alpha to list
     list_reward.append(total_reward)
     list_alpha.append(alpha)

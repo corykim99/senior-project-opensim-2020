@@ -8,6 +8,8 @@ import random
 import gym
 import math
 import matplotlib.pyplot as plt
+import time
+import csv
 from datetime import datetime
 from osim.env import L2M2019Env
 
@@ -15,7 +17,7 @@ from osim.env import L2M2019Env
 
 # Initialize Environment
 env_name = 'L2M2019Env'
-env = L2M2019Env(visualize=True)
+env = L2M2019Env(visualize=False)
 env.reset()
 env._max_episode_steps = 1000 #set max steps per episode
 env.seed(0) #set environment seed for same initial cart positions
@@ -104,29 +106,56 @@ def discretization(env, obs):
             index += 1
     
     # Obtain density values (step sizes)
-    env_den = np.subtract(env_high, env_low)
-    env_den = np.divide(env_den, n_states)
-
+    #env_den = np.subtract(env_high, env_low)
+    #env_den = np.divide(env_den, n_states)
+    
     # Scale values
-    obs_scaled = np.subtract(obs_val, env_low)
-    obs_scaled = np.divide(obs_scaled, env_den)
-    for i in range(339):
-        if obs_scaled[i] > 0:
-            obs_scaled[i] = obs_scaled[i] - 1
-    obs_scaled = obs_scaled.astype(int)
+    #obs_scaled = np.subtract(obs_val, env_low)
+    #obs_scaled = np.divide(obs_scaled, env_den)
+    obs_scaled = np.array(obs_val).astype(int)
     #print(obs_scaled)
+    
     return obs_scaled
 
-# Q-table = 3D table
-# Rows = states (states = 2D table : pos, vel)
-# Columns = actions
-# look into exporting data
-# 339 x 22
-q_table = np.zeros((n_states, env.action_space.shape[0])) #fill Q-table with zeros
+#q_table = np.zeros((n_states, env.action_space.shape[0])) #fill Q-table with zeros
+#q_table = np.load("q_table.npy")
+
+try:
+    # fill Q-table with zeros
+    zeros = np.zeros((n_states, env.action_space.shape[0]))
+    # Load trained data
+    q_table_2D = np.loadtxt('osim_q_table.csv', delimiter=',')
+    q_table = q_table_2D.reshape(q_table_2D.shape[0], q_table_2D.shape[1] // zeros.shape[2], zeros.shape[2])
+    
+except OSError:
+    # Create mc_train_time.csv
+    with open('osim_train_time.csv','w') as f:
+        writer = csv.writer(f)
+        writer.writerow(['Steps', 'Episodes', 'Time Elapsed'])
+    
+    # Create mc_reward.csv
+    with open('osim_reward.csv','a') as f:
+        writer = csv.writer(f)
+        writer.writerow(['Reward'])
+        
+    # Create mc_alpha.csv
+    with open('osim_alpha.csv','a') as f:
+        writer = csv.writer(f)
+        writer.writerow(['Alpha'])
+
+    # Q-table = 3D table
+    # Rows = states (states = 2D table : pos, vel)
+    # Columns = actions
+    # look into exporting data
+    q_table = zeros
+
+    # Save Q-table as mc_q_table.csv
+    # Must reshape 3D array to 2D array
+    q_table_2D = q_table.reshape(q_table.shape[1], -1)
+    np.savetxt('osim_q_table.csv', q_table_2D, delimiter=',')
 
 # Store Training Start Time
-now = datetime.now()
-time_start = now.strftime("%H:%M:%S")
+time_start = time.time()
 
 for episode in range(episodes):
     
@@ -151,15 +180,11 @@ for episode in range(episodes):
         if np.random.uniform(low = 0, high = 1) < epsilon:
             # Explore
             a = np.random.randint(2, size=22)
-            #a = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             #print(a)
         else:
             # Exploit
             #a = np.random.randint(2, size=22)
-            #a = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-            #0 to 2^22-1
-            i = int(np.argmax(q_table[obs_val]) / 22)
-            #print(q_table[obs_val])
+            i = np.argmax(q_table[obs_val])
             a = np.array(q_table[obs_val[i]]).astype(int)
             #print(a)
         
@@ -168,12 +193,7 @@ for episode in range(episodes):
         
         # Update Q-table
         obs_val_ = discretization(env, obs)
-        a = a[None,:]
-        obs_val = obs_val[:,None]
-        q_table[obs_val, a] = (1 - alpha) * q_table[obs_val, a]  + alpha * (reward + gamma * np.max(q_table[obs_val_]))
-        #print(reward)
-        #print(q_table)
-        #print("(1 - {}) * {} + {} * ({} + {} * {})".format(alpha, q_table[obs_val, a], alpha, reward, gamma, np.max(q_table[obs_val_])))
+        q_table[obs_val][a] = (1 - alpha) * q_table[obs_val][a]  + alpha * (reward + gamma * np.max(q_table[obs_val_]))
         steps += 1
         
         # Goal reach (cart reached flag)
@@ -182,36 +202,35 @@ for episode in range(episodes):
             
     # Print results when episode is complete
     print("Episode : Total Reward : Steps\t\t{} : {} : {}".format(episode + 1, truncate(total_reward, 3), steps))
-    print(q_table)
+    np.save("q_table.npy", q_table)
+    
     # Add rewards and alpha to list
     list_reward.append(total_reward)
     list_alpha.append(alpha)
+    np.save("q_reward.npy", list_reward)
+    np.savetxt("q_alpha.npy", list_alpha)
+
+# Save Rewards
+with open('osim_reward.csv','a') as f:
+    writer = csv.writer(f)
+    writer.writerow(list_reward)
+
+# Save Alpha
+with open('osim_alpha.csv','a') as f:
+    writer = csv.writer(f)
+    writer.writerow(list_alpha)
+
+# Save Q-table
+# Must reshape 3D array to 2D array
+q_table_2D = q_table.reshape(q_table.shape[1], -1)
+np.savetxt('osim_q_table.csv', q_table_2D, delimiter=',')
 
 # Store Training End Time
-now = datetime.now()
-time_end = now.strftime("%H:%M:%S")
+time_end = time.time()
+time_elapsed = time.strftime("%H:%M:%S", time.gmtime(time_end - time_start))
+with open('osim_train_time.csv','a') as f:
+    writer = csv.writer(f)
+    writer.writerow([str(env._max_episode_steps), str(episodes), time_elapsed])
 
 # Output training times
-print("Training Complete\nStart : End\t\t{} : {}".format(time_start, time_end))
-
-# Initialize Range
-x = range(episodes)
-
-'''
-# Graph results and total reward over all episodes
-plt1 = plt.figure(1)
-plt.plot(x, list_reward)
-plt.xlabel('Episode')
-plt.ylabel('Reward')
-plt.title('Reward over Episodes')
-
-# Graph the alpha over all episodes
-plt2 = plt.figure(2)
-plt.plot(x, list_alpha)
-plt.xlabel('Episode')
-plt.ylabel('Alpha')
-plt.title('Alpha over Episodes')
-
-# Output Plot
-plt.show()
-'''
+print("Training Complete\nTime elapsed: {}".format(time_elapsed))
