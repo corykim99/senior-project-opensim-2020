@@ -17,7 +17,7 @@ from osim.env import L2M2019Env
 
 # Initialize Environment
 env_name = 'L2M2019Env'
-env = L2M2019Env(visualize=False)
+env = L2M2019Env(visualize=True)
 env.reset()
 env._max_episode_steps = 10 #set max steps per episode
 #env.seed(0) #set environment seed for same initial positions
