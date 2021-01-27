@@ -1,3 +1,4 @@
 #!/bin/bash
-srun -N1 -n1 -p gpu --exclusive python q_train.py
+#SBATCH --mem=64GB
+srun -N 1 -n 1 -p gpu python q_train.py
 exit 0
