@@ -7,6 +7,8 @@ import numpy as np
 import random
 import gym
 import math
+import time
+import csv
 import matplotlib.pyplot as plt
 from datetime import datetime
 from osim.env import L2M2019Env
@@ -15,15 +17,11 @@ from osim.env import L2M2019Env
 
 # Initialize Environment
 env_name = 'L2M2019Env'
-env = L2M2019Env(visualize=False)
+env = L2M2019Env(visualize=True)
 env.reset()
-env._max_episode_steps = 1000 #set max steps per episode
-env.seed(0) #set environment seed for same initial cart positions
-np.random.seed(0) #set numpy rng to reproduce same number sequence
-
-# Get State Space
-print("Action Space {}".format(env.action_space))
-print("State Space {}".format(env.observation_space))
+env._max_episode_steps = 10 #set max steps per episode
+#env.seed(0) #set environment seed for same initial positions
+#np.random.seed(0) #set numpy rng to reproduce same "random" action sequence
 
 # Set Hyperparameters
 initial_lr = 1.0 #learning rate
@@ -32,10 +30,6 @@ gamma = 0.8 #discount factor = balances immediate and future reward (ranges 0.8 
 epsilon = 0.05 #higher -> more exploitation, less exploration
 n_states = 339 #number of states
 episodes = 1000 #number of episodes
-
-# List to track reward and alpha values
-list_reward = []
-list_alpha = []
 
 def recursive_items(dictionary):
     for key, value in dictionary.items():
@@ -104,26 +98,28 @@ def discretization(env, obs):
             index += 1
     
     # Obtain density values (step sizes)
-    #env_den = np.subtract(env_high, env_low)
-    #env_den = np.divide(env_den, n_states)
-    
+    env_den = np.subtract(env_high, env_low)
+    env_den = np.divide(env_den, n_states)
+
     # Scale values
-    #obs_scaled = np.subtract(obs_val, env_low)
-    #obs_scaled = np.divide(obs_scaled, env_den)
-    obs_scaled = np.array(obs_val).astype(int)
+    obs_scaled = np.subtract(obs_val, env_low)
+    obs_scaled = np.divide(obs_scaled, env_den)
+    for i in range(339):
+        if obs_scaled[i] > 0:
+            obs_scaled[i] = obs_scaled[i] - 1
+    obs_scaled = obs_scaled.astype(int)
     #print(obs_scaled)
-    
     return obs_scaled
 
-# Q-table = 3D table
-# Rows = states (states = 2D table : pos, vel)
-# Columns = actions
-# look into exporting data
-q_table = np.zeros((n_states, env.action_space.shape[0])) #fill Q-table with zeros
-
-# Store Training Start Time
-now = datetime.now()
-time_start = now.strftime("%H:%M:%S")
+try:
+    # fill Q-table with zeros
+    zeros = np.zeros((n_states, env.action_space.shape[0])) #fill Q-table with zeros
+    
+    # Load trained data
+    q_table = np.load('train_data/osim_q_table.npy')
+    
+except OSError:
+    print("Load the training data to render the model")
 
 for episode in range(episodes):
     
@@ -152,7 +148,8 @@ for episode in range(episodes):
         else:
             # Exploit
             #a = np.random.randint(2, size=22)
-            i = np.argmax(q_table[obs_val])
+            i = int(np.argmax(q_table[obs_val]) / 22) #fix half qtable not filling
+            #print(q_table[obs_val])
             a = np.array(q_table[obs_val[i]]).astype(int)
             #print(a)
         
@@ -161,7 +158,9 @@ for episode in range(episodes):
         
         # Update Q-table
         obs_val_ = discretization(env, obs)
-        q_table[obs_val][a] = (1 - alpha) * q_table[obs_val][a]  + alpha * (reward + gamma * np.max(q_table[obs_val_]))
+        a = a[None,:]
+        obs_val = obs_val[:,None]
+        q_table[obs_val, a] = (1 - alpha) * q_table[obs_val, a]  + alpha * (reward + gamma * np.max(q_table[obs_val_]))
         steps += 1
         
         # Goal reach (cart reached flag)
@@ -170,36 +169,4 @@ for episode in range(episodes):
             
     # Print results when episode is complete
     print("Episode : Total Reward : Steps\t\t{} : {} : {}".format(episode + 1, truncate(total_reward, 3), steps))
-    
-    # Add rewards and alpha to list
-    list_reward.append(total_reward)
-    list_alpha.append(alpha)
-
-# Store Training End Time
-now = datetime.now()
-time_end = now.strftime("%H:%M:%S")
-
-# Output training times
-print("Training Complete\nStart : End\t\t{} : {}".format(time_start, time_end))
-
-# Initialize Range
-x = range(episodes)
-
-'''
-# Graph results and total reward over all episodes
-plt1 = plt.figure(1)
-plt.plot(x, list_reward)
-plt.xlabel('Episode')
-plt.ylabel('Reward')
-plt.title('Reward over Episodes')
-
-# Graph the alpha over all episodes
-plt2 = plt.figure(2)
-plt.plot(x, list_alpha)
-plt.xlabel('Episode')
-plt.ylabel('Alpha')
-plt.title('Alpha over Episodes')
-
-# Output Plot
-plt.show()
-'''
+    print(q_table)
