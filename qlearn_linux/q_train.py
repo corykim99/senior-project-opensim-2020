@@ -202,7 +202,8 @@ for episode in range(episodes):
             
             a = [int(j) for j in bin(i)[2:]]
             a = np.array(a)
-            a = np.pad(a, (22-len(a), 0), 'constant')
+            if len(a) < 22:
+                a = np.pad(a, (22-len(a), 0), 'constant')
         
         obs, reward, terminate, _ = env.step(a)
         total_reward += reward
