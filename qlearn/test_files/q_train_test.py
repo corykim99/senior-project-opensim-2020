@@ -184,11 +184,10 @@ for episode in range(episodes):
             #print(a)
         else:
             # Exploit
+            #a = np.random.randint(2, size=22)
             i = int(np.argmax(q_table[obs_val]) / 22) #fix half qtable not filling
-            print(q_table[obs_val[i]])
+            #print(q_table[obs_val])
             a = np.array(q_table[obs_val[i]]).astype(int)
-            print(a)
-            
             #print(a)
         
         obs, reward, terminate, _ = env.step(a)
@@ -227,7 +226,7 @@ for episode in range(episodes):
             
     # Print results when episode is complete
     print("Episode : Total Reward : Steps\t\t{} : {} : {}".format(episode + 1, truncate(total_reward, 3), steps))
-    #print(q_table)
+    print(q_table)
     # Add rewards and alpha to list
     list_reward.append(total_reward)
     list_alpha.append(alpha)

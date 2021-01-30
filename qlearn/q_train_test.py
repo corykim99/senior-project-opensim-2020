@@ -37,6 +37,7 @@ min_lr = 0.005 #min learning rate
 gamma = 0.8 #discount factor = balances immediate and future reward (ranges 0.8 to 0.99)
 epsilon = 0.05 #higher -> more exploitation, less exploration
 n_states = 339 #number of states
+n_action = 2**env.action_space.shape[0]
 episodes = 1000 #number of episodes
 
 # List to track reward and alpha values
@@ -124,13 +125,16 @@ def discretization(env, obs):
     return obs_scaled
 
 try:
-    # fill Q-table with zeros
-    zeros = np.zeros((n_states, env.action_space.shape[0])) #fill Q-table with zeros
-    
     # Load trained data
+    print("Loading QTable")
     q_table = np.load('train_data/osim_q_table.npy')
+    print("QTable has been loaded")
     
 except OSError:
+    # fill Q-table with zeros
+    print("Generating zeros")
+    zeros = np.zeros((n_states, n_action)) #fill Q-table with zeros
+    
     # Create mc_train_time.csv
     with open('train_data/osim_train_time.csv','w') as f:
         writer = csv.writer(f)
@@ -154,6 +158,7 @@ except OSError:
 
     # Save Q-table as mc_q_table.csv
     np.save('train_data/osim_q_table.npy', q_table)
+    print("New QTable has been generated")
 
 # Store Training Start Time
 time_start = time.time()
@@ -171,6 +176,7 @@ for episode in range(episodes):
     
     # Agent learning
     while True:
+        print(steps)
         #env.render()
         obs_val = discretization(env, obs)
         
@@ -179,26 +185,30 @@ for episode in range(episodes):
         # Exploration - perform new actions, riskier, slow but improve accuracy in long-term
         # Exploitation - perform similar actions that gave high rewards, safer, fast but may produce inaccurate results
         if np.random.uniform(low = 0, high = 1) < epsilon:
+            #print("Explore")
             # Explore
+            # Binary a -> Decimal i
             a = np.random.randint(2, size=22)
-            #print(a)
-        else:
-            # Exploit
-            i = int(np.argmax(q_table[obs_val]) / 22) #fix half qtable not filling
-            print(q_table[obs_val[i]])
-            a = np.array(q_table[obs_val[i]]).astype(int)
-            print(a)
             
-            #print(a)
+            i = int("".join(str(x) for x in a), 2) 
+        else:
+            #print("Exploit")
+            # Exploit
+            # Decimal i -> Binary a
+            i = int(np.argmax(q_table[obs_val]))
+            #print(q_table[obs_val])
+            
+            a = [int(j) for j in bin(i)[2:]]
+            a = np.array(a)
+            a = np.pad(a, (22-len(a), 0), 'constant')
         
         obs, reward, terminate, _ = env.step(a)
         total_reward += reward
         
         # Update Q-table
         obs_val_ = discretization(env, obs)
-        a = a[None,:]
         obs_val = obs_val[:,None]
-        q_table[obs_val, a] = (1 - alpha) * q_table[obs_val, a]  + alpha * (reward + gamma * np.max(q_table[obs_val_]))
+        q_table[obs_val, i] = (1 - alpha) * q_table[obs_val, i]  + alpha * (reward + gamma * np.max(q_table[obs_val_]))
         steps += 1
         
         # Goal reach (cart reached flag)
