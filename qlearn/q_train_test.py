@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from osim.env import L2M2019Env
 import sys
+import h5py
 
 # Show entire qtable
 np.set_printoptions(threshold=sys.maxsize)
@@ -127,7 +128,8 @@ def discretization(env, obs):
 try:
     # Load trained data
     print("Loading QTable")
-    q_table = np.load('train_data/osim_q_table.npy')
+    #q_table = np.load('train_data/osim_q_table.npy')
+    q_table = h5py.File('train_data/osim_q_table.h5', 'r')
     print("QTable has been loaded")
     
 except OSError:
@@ -157,7 +159,8 @@ except OSError:
     q_table = zeros
 
     # Save Q-table as mc_q_table.csv
-    np.save('train_data/osim_q_table.npy', q_table)
+    #np.save('train_data/osim_q_table.npy', q_table)
+    h5py.File('train_data/osim_q_table.h5', 'w')
     print("New QTable has been generated")
 
 # Store Training Start Time
@@ -226,7 +229,8 @@ for episode in range(episodes):
                 writer.writerow(list_alpha)
 
             # Save Q-table
-            np.save('train_data/osim_q_table.npy', q_table)
+            #np.save('train_data/osim_q_table.npy', q_table)
+            h5py.File('train_data/osim_q_table.h5', 'w')
 
             # Store Training End Time
             time_end = time.time()
@@ -253,7 +257,8 @@ with open('train_data/osim_alpha.csv','a') as f:
     writer.writerow(list_alpha)
 
 # Save Q-table
-np.save('train_data/osim_q_table.npy', q_table)
+#np.save('train_data/osim_q_table.npy', q_table)
+h5py.File('train_data/osim_q_table.h5', 'w')
 
 # Store Training End Time
 time_end = time.time()
