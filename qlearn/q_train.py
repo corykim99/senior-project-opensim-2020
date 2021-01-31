@@ -15,6 +15,9 @@ from osim.env import L2M2019Env
 import sys
 import h5py
 
+# Directory for training data
+save_dir = 'train_data/'
+
 # Show entire qtable
 np.set_printoptions(threshold=sys.maxsize)
 
@@ -37,7 +40,7 @@ initial_lr = 1.0 #learning rate
 min_lr = 0.005 #min learning rate
 gamma = 0.8 #discount factor = balances immediate and future reward (ranges 0.8 to 0.99)
 epsilon = 0.05 #higher -> more exploitation, less exploration
-n_states = 339 #number of states
+n_states = 10 #number of states
 n_action = 2**env.action_space.shape[0]
 episodes = 1000 #number of episodes
 
@@ -129,26 +132,26 @@ try:
     # Load trained data
     print("Loading QTable")
     #q_table = np.load('train_data/osim_q_table.npy')
-    q_table = h5py.File('train_data/osim_q_table.h5', 'r')
+    q_table = h5py.File(save_dir + 'osim_q_table.h5', 'r')
     print("QTable has been loaded")
     
 except OSError:
     # fill Q-table with zeros
     print("Generating zeros")
-    zeros = np.zeros((n_states, n_action)) #fill Q-table with zeros
+    zeros = np.zeros((env.observation_space.shape[0], n_states, n_action), dtype='uint8') #fill Q-table with zeros
     
     # Create mc_train_time.csv
-    with open('train_data/osim_train_time.csv','w') as f:
+    with open(save_dir + 'osim_train_time.csv','w') as f:
         writer = csv.writer(f)
         writer.writerow(['Steps', 'Episodes', 'Time Elapsed'])
     
     # Create mc_reward.csv
-    with open('train_data/osim_reward.csv','a') as f:
+    with open(save_dir + 'osim_reward.csv','a') as f:
         writer = csv.writer(f)
         writer.writerow(['Reward'])
         
     # Create mc_alpha.csv
-    with open('train_data/osim_alpha.csv','a') as f:
+    with open(save_dir + 'osim_alpha.csv','a') as f:
         writer = csv.writer(f)
         writer.writerow(['Alpha'])
 
@@ -160,7 +163,7 @@ except OSError:
 
     # Save Q-table as mc_q_table.csv
     #np.save('train_data/osim_q_table.npy', q_table)
-    h5py.File('train_data/osim_q_table.h5', 'w')
+    h5py.File(save_dir + 'osim_q_table.h5', 'w')
     print("New QTable has been generated")
 
 # Store Training Start Time
@@ -211,7 +214,10 @@ for episode in range(episodes):
         # Update Q-table
         obs_val_ = discretization(env, obs)
         obs_val = obs_val[:,None]
-        q_table[obs_val, i] = (1 - alpha) * q_table[obs_val, i]  + alpha * (reward + gamma * np.max(q_table[obs_val_]))
+        
+        for index in range(env.observation_space.shape[0]):
+            q_table[index, obs_val[index], i] = (1 - alpha) * q_table[index, obs_val[index], i]  + alpha * (reward + gamma * np.max(q_table[index, obs_val_[index]]))
+
         steps += 1
         
         # Goal reach (cart reached flag)
@@ -219,23 +225,23 @@ for episode in range(episodes):
             break
         elif episode % 100 == 0:
             # Save Rewards
-            with open('train_data/osim_reward.csv','a') as f:
+            with open(save_dir + 'osim_reward.csv','a') as f:
                 writer = csv.writer(f)
                 writer.writerow(list_reward)
 
             # Save Alpha
-            with open('train_data/osim_alpha.csv','a') as f:
+            with open(save_dir + 'osim_alpha.csv','a') as f:
                 writer = csv.writer(f)
                 writer.writerow(list_alpha)
 
             # Save Q-table
             #np.save('train_data/osim_q_table.npy', q_table)
-            h5py.File('train_data/osim_q_table.h5', 'w')
+            h5py.File(save_dir + 'osim_q_table.h5', 'w')
 
             # Store Training End Time
             time_end = time.time()
             time_elapsed = time.strftime("%H:%M:%S", time.gmtime(time_end - time_start))
-            with open('train_data/osim_train_time.csv','a') as f:
+            with open(save_dir + 'osim_train_time.csv','a') as f:
                 writer = csv.writer(f)
                 writer.writerow([str(env._max_episode_steps), str(episodes), time_elapsed])
             
@@ -247,23 +253,23 @@ for episode in range(episodes):
     list_alpha.append(alpha)
 
 # Save Rewards
-with open('train_data/osim_reward.csv','a') as f:
+with open(save_dir + 'osim_reward.csv','a') as f:
     writer = csv.writer(f)
     writer.writerow(list_reward)
 
 # Save Alpha
-with open('train_data/osim_alpha.csv','a') as f:
+with open(save_dir + 'osim_alpha.csv','a') as f:
     writer = csv.writer(f)
     writer.writerow(list_alpha)
 
 # Save Q-table
 #np.save('train_data/osim_q_table.npy', q_table)
-h5py.File('train_data/osim_q_table.h5', 'w')
+h5py.File(save_dir + 'osim_q_table.h5', 'w')
 
 # Store Training End Time
 time_end = time.time()
 time_elapsed = time.strftime("%H:%M:%S", time.gmtime(time_end - time_start))
-with open('train_data/osim_train_time.csv','a') as f:
+with open(save_dir + 'osim_train_time.csv','a') as f:
     writer = csv.writer(f)
     writer.writerow([str(env._max_episode_steps), str(episodes), time_elapsed])
 
