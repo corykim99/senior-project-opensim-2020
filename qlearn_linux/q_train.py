@@ -25,7 +25,7 @@ np.set_printoptions(threshold=sys.maxsize)
 
 # Initialize Environment
 env_name = 'L2M2019Env'
-env = L2M2019Env(visualize=False)
+env = L2M2019Env(visualize=True)
 env.reset()
 env._max_episode_steps = 10 #set max steps per episode
 #env.seed(0) #set environment seed for same initial positions
@@ -190,20 +190,21 @@ for episode in range(episodes):
         # Exploration - perform new actions, riskier, slow but improve accuracy in long-term
         # Exploitation - perform similar actions that gave high rewards, safer, fast but may produce inaccurate results
         if np.random.uniform(low = 0, high = 1) < epsilon:
-            #print("Explore")
+            print("Explore")
             # Explore
             # Binary a -> Decimal i
             a = np.random.randint(2, size=22)
             
-            i = int("".join(str(x) for x in a), 2) 
+            i_q = int("".join(str(x) for x in a), 2) 
         else:
-            #print("Exploit")
+            print("Exploit")
             # Exploit
             # Decimal i -> Binary a
-            i = int(np.argmax(q_table[obs_val]))
+            #i = int(np.argmax(q_table[obs_val]))
+            i_q = int(np.where(q_table.max)[0])
             #print(q_table[obs_val])
             
-            a = [int(j) for j in bin(i)[2:]]
+            a = [int(j) for j in bin(i_q)[2:]]
             a = np.array(a)
             if len(a) < 22:
                 a = np.pad(a, (22-len(a), 0), 'constant')
@@ -215,8 +216,9 @@ for episode in range(episodes):
         obs_val_ = discretization(env, obs)
         obs_val = obs_val[:,None]
         
-        for index in range(env.observation_space.shape[0]):
-            q_table[index, obs_val[index], i] = (1 - alpha) * q_table[index, obs_val[index], i]  + alpha * (reward + gamma * np.max(q_table[index, obs_val_[index]]))
+        for i_obs in range(env.observation_space.shape[0]):
+            print("step : i_obs : obs_val[i_obs] : i_q : action\t{} : {} : {} : {} : {}".format(steps, i_obs, obs_val[i_obs], i_q, a))
+            q_table[i_obs, obs_val[i_obs], i_q] = (1 - alpha) * q_table[i_obs, obs_val[i_obs], i_q]  + alpha * (reward + gamma * np.max(q_table[i_obs, obs_val_[i_obs]]))
 
         steps += 1
         
